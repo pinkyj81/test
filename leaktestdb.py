@@ -1,17 +1,16 @@
 import streamlit as st
 import pandas as pd
-import pyodbc
+import pymssql
 import altair as alt
 from datetime import date
 
 # 1. MSSQL 연결 함수
 def get_connection():
-    return pyodbc.connect(
-        "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=ms1901.gabiadb.com;"
-        "DATABASE=yujincast;"
-        "UID=pinkyj81;"
-        "PWD=zoskek38!!"
+    return pymssql.connect(
+        server='ms1901.gabiadb.com',
+        user='pinkyj81',
+        password='zoskek38!!',
+        database='yujincast'
     )
 
 # 2. 데이터 불러오기
@@ -23,7 +22,7 @@ def load_data():
     return df
 
 # 3. Streamlit 앱 시작
-st.title("Prc1별 TD 상태 조회 ")
+st.title("Prc1별 TD 상태 조회")
 
 df = load_data()
 
