@@ -1,3 +1,5 @@
 streamlit
-pymssql
 pandas
+pymssql
+altair
+openpyxl
