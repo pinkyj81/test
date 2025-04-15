@@ -1,17 +1,16 @@
 import streamlit as st
 import pandas as pd
-import pyodbc
+import pymssql
 import altair as alt
 from datetime import datetime
 
-# 1. MSSQL 연결 함수
+# 1. MSSQL 연결 함수 (pymssql 사용)
 def get_connection():
-    return pyodbc.connect(
-        "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=ms1901.gabiadb.com;"
-        "DATABASE=yujincast;"
-        "UID=pinkyj81;"
-        "PWD=zoskek38!!"
+    return pymssql.connect(
+        server='ms1901.gabiadb.com',
+        user='pinkyj81',
+        password='zoskek38!!',
+        database='yujincast'
     )
 
 # 2. 조건 검색 함수
@@ -20,8 +19,8 @@ def load_filtered_data(start_date, end_date, product):
     query = """
         SELECT * 
         FROM yujincast.dbo.M3_2025_TD
-        WHERE [Date] BETWEEN ? AND ?
-        AND ([Product] = ? OR ? = '')
+        WHERE [Date] BETWEEN %s AND %s
+        AND ([Product] = %s OR %s = '')
     """
     df = pd.read_sql(query, conn, params=[start_date, end_date, product, product])
     conn.close()
@@ -42,7 +41,7 @@ with col3:
 with col4:
     search_button = st.button("🔍 검색")
 
-# 5. 검색 실행 시
+# 5. 검색 실행
 if search_button:
     df = load_filtered_data(start_date, end_date, product)
 
@@ -50,17 +49,12 @@ if search_button:
         st.warning("조회된 데이터가 없습니다.")
     else:
         st.success(f"총 {len(df)}건이 조회되었습니다.")
-
-        # ✅ 너비 맞춘 데이터프레임 출력
         st.dataframe(df, use_container_width=True)
 
-        # ✅ 날짜 컬럼 타입 변환
         df['Date'] = pd.to_datetime(df['Date'])
 
-        # ✅ 날짜 + Prc1별 막대그래프용 데이터 그룹핑
         chart_data = df.groupby(['Date', 'Prc1']).size().reset_index(name='Count')
 
-        # ✅ Altair 막대그래프 생성
         chart = alt.Chart(chart_data).mark_bar().encode(
             x=alt.X('Date:T', title='날짜'),
             y=alt.Y('Count:Q', title='개수'),
@@ -71,10 +65,10 @@ if search_button:
             title='📅 날짜별 Prc1 발생 건수'
         )
 
-        # ✅ 그래프 출력 (너비 통일)
         st.altair_chart(chart, use_container_width=True)
-        
-        st.header("📂 엑셀 업로드로 데이터 추가")
+
+# 6. 엑셀 업로드로 DB에 데이터 추가
+st.header("📂 엑셀 업로드로 데이터 추가")
 
 uploaded_file = st.file_uploader("엑셀 파일 업로드 (.xlsx)", type=["xlsx"])
 
@@ -82,14 +76,12 @@ if uploaded_file:
     try:
         df_excel = pd.read_excel(uploaded_file)
 
-        # 필수 컬럼
         required_columns = ['Date', 'Time', 'Prc1', 'Prc2', 'State', 'Value', 'Note1', 'Product']
 
         if all(col in df_excel.columns for col in required_columns):
             st.success("✅ 업로드된 엑셀 미리보기:")
             st.dataframe(df_excel, use_container_width=True)
 
-            # 중복 제거 옵션
             remove_duplicates = st.checkbox("⚠️ 중복 (Date + Time + Prc1) 제거", value=True)
 
             if remove_duplicates:
@@ -98,7 +90,6 @@ if uploaded_file:
                 after = len(df_excel)
                 st.info(f"중복 제거: {before - after}건 삭제됨 (총 {after}건 남음)")
 
-            # 업로드 실행 버튼
             if st.button("📝 DB에 추가"):
                 try:
                     conn = get_connection()
@@ -109,9 +100,9 @@ if uploaded_file:
                         cursor.execute("""
                             INSERT INTO yujincast.dbo.M3_2025_TD
                             ([Date], [Time], [Prc1], [Prc2], [State], [Value], [Note1], [Product])
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """, row['Date'], row['Time'], row['Prc1'], row['Prc2'],
-                             row['State'], row['Value'], row['Note1'], row['Product'])
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (row['Date'], row['Time'], row['Prc1'], row['Prc2'],
+                              row['State'], row['Value'], row['Note1'], row['Product']))
                         inserted_count += 1
 
                     conn.commit()
@@ -126,4 +117,3 @@ if uploaded_file:
 
     except Exception as e:
         st.error(f"❌ 엑셀 처리 중 오류 발생: {e}")
-
