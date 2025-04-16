@@ -4,7 +4,7 @@ import pymssql
 import altair as alt
 from datetime import datetime
 
-# 1. MSSQL 연결 함수 (pymssql 사용)
+# MSSQL 연결 함수
 def get_connection():
     return pymssql.connect(
         server='ms1901.gabiadb.com',
@@ -13,7 +13,7 @@ def get_connection():
         database='yujincast'
     )
 
-# 2. 조건 검색 함수
+# 조건 검색 함수
 def load_filtered_data(start_date, end_date, product):
     conn = get_connection()
     query = """
@@ -26,12 +26,11 @@ def load_filtered_data(start_date, end_date, product):
     conn.close()
     return df
 
-# 3. 앱 제목
+# 앱 제목
 st.title("📊 Prc1별 TD 상태 조회")
 
-# 4. 조건 입력 UI (가로 정렬)
+# 조건 입력 UI
 col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-
 with col1:
     start_date = st.date_input("시작 날짜", datetime(2025, 1, 1))
 with col2:
@@ -41,7 +40,7 @@ with col3:
 with col4:
     search_button = st.button("🔍 검색")
 
-# 5. 검색 실행
+# 조건 검색 실행
 if search_button:
     df = load_filtered_data(start_date, end_date, product)
 
@@ -67,14 +66,18 @@ if search_button:
 
         st.altair_chart(chart, use_container_width=True)
 
-# 6. 엑셀 업로드로 DB에 데이터 추가
+# 엑셀 업로드로 DB에 데이터 추가
 st.header("📂 엑셀 업로드로 데이터 추가")
 
 uploaded_file = st.file_uploader("엑셀 파일 업로드 (.xlsx)", type=["xlsx"])
 
 if uploaded_file:
     try:
-        df_excel = pd.read_excel(uploaded_file)
+        df_excel = pd.read_excel(uploaded_file, engine='openpyxl')
+
+        # NaN 컬럼 제거 및 컬럼명 문자열화
+        df_excel = df_excel.loc[:, ~df_excel.columns.isna()]
+        df_excel.columns = [str(col).strip() for col in df_excel.columns]
 
         required_columns = ['Date', 'Time', 'Prc1', 'Prc2', 'State', 'Value', 'Note1', 'Product']
 
@@ -97,12 +100,14 @@ if uploaded_file:
 
                     inserted_count = 0
                     for _, row in df_excel.iterrows():
+                        # NaN 값은 None으로 치환
+                        values = [row.get(col) if pd.notna(row.get(col)) else None for col in required_columns]
+
                         cursor.execute("""
                             INSERT INTO yujincast.dbo.M3_2025_TD
                             ([Date], [Time], [Prc1], [Prc2], [State], [Value], [Note1], [Product])
                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (row['Date'], row['Time'], row['Prc1'], row['Prc2'],
-                              row['State'], row['Value'], row['Note1'], row['Product']))
+                        """, values)
                         inserted_count += 1
 
                     conn.commit()
