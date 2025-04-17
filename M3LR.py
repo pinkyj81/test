@@ -66,14 +66,17 @@ if search_button:
 
         st.altair_chart(chart, use_container_width=True)
 
-# 엑셀 업로드로 DB에 데이터 추가
-st.header("📂 엑셀 업로드로 데이터 추가")
+# 엑셀 또는 CSV 업로드로 DB에 데이터 추가
+st.header("📂 엑셀 또는 CSV 업로드로 데이터 추가")
 
-uploaded_file = st.file_uploader("엑셀 파일 업로드 (.xlsx)", type=["xlsx"])
+uploaded_file = st.file_uploader("엑셀(.xlsx) 또는 CSV(.csv) 파일 업로드", type=["xlsx", "csv"])
 
 if uploaded_file:
     try:
-        df_excel = pd.read_excel(uploaded_file, engine='openpyxl')
+        if uploaded_file.name.endswith(".xlsx"):
+            df_excel = pd.read_excel(uploaded_file, engine='openpyxl')
+        else:
+            df_excel = pd.read_csv(uploaded_file)
 
         # NaN 컬럼 제거 및 컬럼명 문자열화
         df_excel = df_excel.loc[:, ~df_excel.columns.isna()]
@@ -82,7 +85,7 @@ if uploaded_file:
         required_columns = ['Date', 'Time', 'Prc1', 'Prc2', 'State', 'Value', 'Note1', 'Product']
 
         if all(col in df_excel.columns for col in required_columns):
-            st.success("✅ 업로드된 엑셀 미리보기:")
+            st.success("✅ 업로드된 데이터 미리보기:")
             st.dataframe(df_excel, use_container_width=True)
 
             remove_duplicates = st.checkbox("⚠️ 중복 (Date + Time + Prc1) 제거", value=True)
@@ -98,27 +101,27 @@ if uploaded_file:
                     conn = get_connection()
                     cursor = conn.cursor()
 
-                    inserted_count = 0
-                    for _, row in df_excel.iterrows():
-                        # NaN 값은 None으로 치환
-                        values = [row.get(col) if pd.notna(row.get(col)) else None for col in required_columns]
+                    # NaN 값은 None으로 변환하고 튜플 리스트 생성
+                    values_to_insert = [
+                        tuple(row[col] if pd.notna(row[col]) else None for col in required_columns)
+                        for _, row in df_excel.iterrows()
+                    ]
 
-                        cursor.execute("""
-                            INSERT INTO yujincast.dbo.M3_2025_TD
-                            ([Date], [Time], [Prc1], [Prc2], [State], [Value], [Note1], [Product])
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """, values)
-                        inserted_count += 1
+                    cursor.executemany("""
+                        INSERT INTO yujincast.dbo.M3_2025_TD
+                        ([Date], [Time], [Prc1], [Prc2], [State], [Value], [Note1], [Product])
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, values_to_insert)
 
                     conn.commit()
                     conn.close()
-                    st.success(f"🎉 {inserted_count}건의 데이터가 성공적으로 추가되었습니다.")
+                    st.success(f"🎉 {len(values_to_insert)}건의 데이터가 성공적으로 추가되었습니다.")
 
                 except Exception as e:
                     st.error(f"❌ DB 저장 중 오류: {e}")
 
         else:
-            st.error(f"❌ 엑셀에 필수 컬럼이 없습니다: {required_columns}")
+            st.error(f"❌ 엑셀/CSV에 필수 컬럼이 없습니다: {required_columns}")
 
     except Exception as e:
-        st.error(f"❌ 엑셀 처리 중 오류 발생: {e}")
+        st.error(f"❌ 파일 처리 중 오류 발생: {e}")
