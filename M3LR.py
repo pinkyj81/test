@@ -27,7 +27,7 @@ def load_filtered_data(start_date, end_date, product):
     return df
 
 # 앱 제목
-st.title("📊 Prc1별 TD 상태 조회")
+st.title("📊 리크(TD) 공정별 상태 조회")
 
 # 조건 입력 UI
 col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
@@ -61,7 +61,7 @@ if search_button:
             tooltip=['Date', 'Prc1', 'Count']
         ).properties(
             height=400,
-            title='📅 날짜별 Prc1 발생 건수'
+            title='📅 날짜별 공정별 발생 건수'
         )
 
         st.altair_chart(chart, use_container_width=True)
