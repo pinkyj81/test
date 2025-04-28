@@ -109,7 +109,7 @@ def make_calendar_html(df_plan, df_log, year, month):
     </style>
     """
     html += '<table border="1" style="border-collapse:collapse; text-align:left;">'
-    html += '<tr>' + ''.join(f'<th>{w}</th>' for w in ['일','월','화','수','목','금','토']) + '</tr>'
+    html += '<tr>' + ''.join(f'<th>{w}</th>' for w in ['월','화','수','목','금','토','일']) + '</tr>'
     for week in cal:
         html += '<tr>'
         for day in week:
